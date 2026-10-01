@@ -1,0 +1,45 @@
+[project]
+name = "cdms-prototype"
+version = "0.1.0"
+description = "Change Data Management Service prototype"
+requires-python = ">=3.12"
+dependencies = []
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+extend-exclude = [".venv", "migrations/versions"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "BLE", "C4", "SIM", "RUF", "ASYNC", "T20"]
+ignore = [
+    "B008",
+    "RUF001",
+    "RUF002",
+    "RUF003",
+    "N818",
+    "UP042",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"**/migrations/**" = ["E501", "F401"]
+"scripts/**" = ["T20"]
+"services/loadtest/**" = ["T20"]
+"services/cdms/cdms/schemas/webhook.py" = ["N815"]
+"services/cdms/cdms/models/enums.py" = ["N811"]
+"services/inventory_mock/inventory_mock/models.py" = ["N815"]
+"services/inventory_mock/inventory_mock/store.py" = ["N815"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unreachable = true
+plugins = ["pydantic.mypy"]
+mypy_path = "services/cdms:services/inventory_mock"
+explicit_package_bases = true
+namespace_packages = true
+exclude = ["^services/loadtest/", "^scripts/"]
+
+[[tool.mypy.overrides]]
+module = ["faker.*", "apscheduler.*", "locust.*"]
+ignore_missing_imports = true

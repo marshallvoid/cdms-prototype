@@ -1,0 +1,85 @@
+name: cdms
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-cdms}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cdms}
+      POSTGRES_DB: ${POSTGRES_DB:-cdms}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cdms} -d ${POSTGRES_DB:-cdms}"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+    networks: [cdms-net]
+
+  inventory:
+    build:
+      context: ./services/inventory_mock
+    env_file: [.env]
+    environment:
+      MOCK_PORT: "8000"
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    networks: [cdms-net]
+
+  cdms:
+    build:
+      context: ./services/cdms
+    env_file: [.env]
+    environment:
+      CDMS_PORT: "8001"
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn cdms.main:app --host 0.0.0.0 --port ${CDMS_PORT:-8001} --workers 1"
+    ports:
+      - "8001:8001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      inventory:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8001/api/v1/ready')"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    networks: [cdms-net]
+
+  loadtest:
+    build:
+      context: ./services/loadtest
+    profiles: ["load"]
+    env_file: [.env]
+    depends_on:
+      cdms:
+        condition: service_healthy
+    entrypoint: ["locust", "-f", "locustfile.py"]
+    environment:
+      LOCUST_HOST: ${LOCUST_HOST:-http://cdms:8001}
+      LOAD_SKUS_PER_USER: ${LOAD_SKUS_PER_USER:-10}
+      LOAD_DUPLICATE_RATE: ${LOAD_DUPLICATE_RATE:-0.2}
+      LOAD_STALE_RATE: ${LOAD_STALE_RATE:-0.05}
+      LOAD_READ_WEIGHT: ${LOAD_READ_WEIGHT:-3}
+      LOAD_POLL_WEIGHT: ${LOAD_POLL_WEIGHT:-0}
+    ports:
+      - "8089:8089"
+    networks: [cdms-net]
+
+volumes:
+  postgres-data:
+
+networks:
+  cdms-net:
+    driver: bridge

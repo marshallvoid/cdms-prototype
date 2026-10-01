@@ -1,0 +1,8 @@
+# Development / CI tooling for the CDMS prototype.
+-r services/cdms/requirements.txt
+-r services/inventory_mock/requirements.txt
+
+ruff>=0.6
+mypy>=1.11
+httpx>=0.27
+anyio>=4.4
